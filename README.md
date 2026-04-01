@@ -115,22 +115,27 @@ chmod +x ~/.claude/hooks/improve-prompt.py
 
 ## Usage
 
-**Normal use:**
+**Normal use (default pass-through):**
 ```bash
-claude "fix the bug"      # Hook evaluates, may ask questions
-claude "add tests"        # Hook evaluates, may ask questions
+claude "fix the bug"      # Direct execution, no evaluation
+claude "add tests"        # Direct execution, no evaluation
 ```
 
-**Bypass prefixes:**
+**Trigger evaluation with `?` prefix:**
 ```bash
-claude "* add dark mode"                    # * = skip evaluation
-claude "/help"                              # / = slash commands bypass
-claude "# remember to use rg over grep"     # # = memorize bypass
+claude "? fix the bug"                    # ? = trigger evaluation
+claude "? add tests"                      # ? = trigger evaluation
 ```
 
-**Vague prompt:**
+**Special prefixes:**
 ```bash
-$ claude "fix the error"
+claude "/help"                              # / = slash commands (preserved)
+claude "# remember to use rg over grep"     # # = memorize (preserved)
+```
+
+**Vague prompt (with `?` trigger):**
+```bash
+$ claude "? fix the error"
 ```
 
 Claude asks:
@@ -152,9 +157,10 @@ Claude proceeds immediately without questions.
 
 ## Design Philosophy
 
-- **Rarely intervene** - Most prompts pass through unchanged
-- **Trust user intent** - Only ask when genuinely unclear
-- **Use conversation history** - Avoid redundant exploration
+- **User control** - Evaluation only when requested (`?` prefix)
+- **Trust user intent** - Default pass-through mode
+- **Zero overhead by default** - No evaluation unless triggered
+- **Use conversation history** - Avoid redundant exploration when triggered
 - **Max 1-6 questions** - Enough for complex scenarios, still focused
 - **Transparent** - Evaluation visible in conversation
 
@@ -164,9 +170,9 @@ Claude proceeds immediately without questions.
 
 **Hook (scripts/improve-prompt.py) - Evaluation Orchestrator:**
 - Intercepts via stdin/stdout JSON (~70 lines)
-- Handles bypass prefixes: `*`, `/`, `#`
-- Wraps prompts with evaluation instructions (~189 tokens)
-- Claude evaluates clarity using conversation history
+- Default pass-through mode (zero overhead)
+- Trigger with `?` prefix for evaluation (~189 tokens)
+- Preserves `/` (slash commands) and `#` (memorize)
 - If vague: Instructs Claude to invoke `prompt-improver` skill
 
 **Skill (skills/prompt-improver/) - Research & Question Logic:**
@@ -179,19 +185,17 @@ Claude proceeds immediately without questions.
   - `research-strategies.md`: Context gathering (300-400 lines)
   - `examples.md`: Real transformations (200-300 lines)
 
-**Flow for Clear Prompts:**
-1. Hook wraps with evaluation prompt (~189 tokens)
-2. Claude evaluates: prompt is clear
-3. Claude proceeds immediately (no skill invocation)
-4. **Total overhead: ~189 tokens**
+**Flow for Clear Prompts (without `?` prefix):**
+1. Hook passes through unchanged
+2. Claude executes immediately
+3. **Total overhead: 0 tokens**
 
-**Flow for Vague Prompts:**
+**Flow for Evaluation Triggered (with `?` prefix):**
 1. Hook wraps with evaluation prompt (~189 tokens)
-2. Claude evaluates: prompt is vague
-3. Claude invokes `prompt-improver` skill
-4. Skill loads research/question guidance
-5. Claude creates research plan, gathers context, asks questions
-6. **Total overhead: ~189 tokens + skill load**
+2. Claude evaluates using conversation history
+3. If clear: proceeds immediately (no skill invocation)
+4. If vague: invokes `prompt-improver` skill for research/questions
+5. **Total overhead: ~189 tokens + skill load (if vague)**
 
 **Progressive Disclosure Benefits:**
 - Clear prompts: Never load skill (zero skill overhead)
@@ -213,40 +217,39 @@ Use the prompt-improver skill to research and clarify: "add authentication"
 
 ## Token Overhead
 
-**v0.4.0 Update:** 31% reduction through hook-level evaluation
+**v0.5.0 Update:** On-demand evaluation architecture
 
-- **Per prompt (v0.4.0):** ~189 tokens (evaluation prompt)
-- **Per prompt (v0.3.x):** ~275 tokens (embedded evaluation logic)
-- **Reduction:** ~86 tokens saved per prompt (31% decrease)
-- **30-message session:** ~5.7k tokens (~2.8% of 200k context, down from 4.1%)
-- **Trade-off:** Minimal overhead for better first-attempt results
+- **Default mode:** 0 tokens (pass-through)
+- **With `?` trigger:** ~189 tokens (evaluation prompt)
+- **Control:** User decides when evaluation is needed
+- **Trade-off:** Zero overhead for most prompts, full evaluation when requested
 
-**Clear prompts benefit:**
-- Evaluation happens in hook (~189 tokens)
-- Claude proceeds immediately (no skill load)
-- Zero skill overhead for clear prompts
+**Default pass-through:**
+- No evaluation wrapper
+- Claude executes immediately
+- Zero overhead
 
-**Vague prompts:**
-- Evaluation in hook (~189 tokens)
-- Skill loads only when needed for research/questions
+**Triggered evaluation (`?` prefix):**
+- Evaluation wrapper (~189 tokens)
+- Skill loads only if prompt is vague
 - Progressive disclosure: reference files load on-demand
 
 ## FAQ
 
 **Does this work on all prompts?**
-Yes, unless you use bypass prefixes (`*`, `/`, `#`).
+Default mode passes through all prompts unchanged. Use `?` prefix to trigger evaluation.
 
 **Will it slow me down?**
-Only slightly when it asks questions. Faster overall due to better context.
+Only when you use `?` prefix and it asks questions. Faster overall due to better context when needed.
 
 **Will I get bombarded with questions?**
-No. It rarely intervenes, passes through most prompts, and asks max 1-6 questions.
+No. You control when evaluation happens via `?` prefix. When triggered, it asks max 1-6 questions.
 
 **Can I customize behavior?**
 It adapts automatically using conversation history, dynamic research planning, and CLAUDE.md.
 
-**What if I don't want improvement?**
-Use `*` prefix: `claude "* your prompt here"`
+**What if I want evaluation?**
+Use `?` prefix: `claude "? your prompt here"`
 
 ## License
 

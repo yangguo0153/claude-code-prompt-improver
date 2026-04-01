@@ -11,10 +11,11 @@ Transform vague, ambiguous prompts into actionable, well-defined requests throug
 
 ## When This Skill is Invoked
 
-**Automatic invocation:**
-- UserPromptSubmit hook evaluates prompt
-- Hook determines prompt is vague (missing specifics, context, or clear target)
-- Hook invokes this skill to guide research and questioning
+**User-triggered invocation:**
+- User starts prompt with `?` prefix
+- UserPromptSubmit hook wraps prompt with evaluation
+- Claude evaluates using conversation history
+- If vague: this skill is invoked for research and questioning
 
 **Manual invocation:**
 - To enrich a vague prompt with research-based questions
@@ -22,8 +23,8 @@ Transform vague, ambiguous prompts into actionable, well-defined requests throug
 - When prompt lacks sufficient context even with conversation history
 
 **Assumptions:**
-- Prompt has already been identified as vague
-- Evaluation phase is complete (done by hook)
+- User explicitly requested evaluation (`?` prefix)
+- Prompt has been identified as vague by Claude
 - Proceed directly to research and clarification
 
 ## Core Workflow

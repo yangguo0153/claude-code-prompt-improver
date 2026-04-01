@@ -37,9 +37,9 @@ A UserPromptSubmit hook plugin that enriches vague prompts before Claude Code ex
 
 **Hook Layer (scripts/improve-prompt.py):**
 - Evaluation orchestrator - reads stdin JSON, writes stdout JSON
-- Handles bypass prefixes: `*` (skip), `/` (slash commands), `#` (memorize)
-- Wraps prompts with evaluation instructions for clarity assessment
-- Claude evaluates clarity using conversation history
+- Default pass-through mode (zero overhead)
+- Trigger with `?` prefix for evaluation (~189 tokens)
+- Preserves `/` (slash commands) and `#` (memorize)
 - If vague: instructs Claude to invoke prompt-improver skill
 
 **Skill Layer (skills/prompt-improver/):**
@@ -70,9 +70,10 @@ A UserPromptSubmit hook plugin that enriches vague prompts before Claude Code ex
 - Hook commands use `python3 || python` fallback for Windows compatibility
 
 **Bypass prefixes:**
-- `*` prefix: Skip evaluation entirely, strip prefix from prompt
-- `/` prefix: Slash commands bypass automatically
-- `#` prefix: Memorize commands bypass automatically
+- `?` prefix: Trigger evaluation, strip prefix from prompt
+- `/` prefix: Slash commands pass through automatically
+- `#` prefix: Memorize commands pass through automatically
+- Default: All other prompts pass through unchanged (no evaluation)
 
 **File paths:**
 - Use forward slashes (Unix-style) per Claude Code standards
@@ -97,16 +98,18 @@ A UserPromptSubmit hook plugin that enriches vague prompts before Claude Code ex
 ## Detected Patterns
 
 **Progressive disclosure:**
-- Clear prompts: evaluation only, no skill load
+- Default mode: pass-through, zero overhead
+- Triggered evaluation (`?`): evaluation wrapper only
 - Vague prompts: evaluation + skill load + references
 - Reference materials load only when needed
-- Zero context penalty for unused reference materials
+- Zero context penalty for default pass-through
 
 **Evaluation flow:**
-1. Hook wraps prompt with evaluation instructions
-2. Claude evaluates using conversation history
-3. If clear: proceed immediately
-4. If vague: invoke prompt-improver skill, then research, questions, execute
+1. User adds `?` prefix to trigger evaluation
+2. Hook wraps prompt with evaluation instructions
+3. Claude evaluates using conversation history
+4. If clear: proceed immediately
+5. If vague: invoke prompt-improver skill, then research, questions, execute
 
 **Research and questioning:**
 - Create dynamic research plan via TodoWrite
@@ -144,9 +147,10 @@ A UserPromptSubmit hook plugin that enriches vague prompts before Claude Code ex
 <!-- MANUAL -->
 ## Design Philosophy
 
-- **Rarely intervene** - Most prompts pass through unchanged
-- **Trust user intent** - Only ask when genuinely unclear
-- **Use conversation history** - Avoid redundant exploration
+- **User control** - Evaluation only when requested (`?` prefix)
+- **Trust user intent** - Default pass-through mode
+- **Zero overhead by default** - No evaluation unless triggered
+- **Use conversation history** - Avoid redundant exploration when triggered
 - **Max 1-6 questions** - Enough for complex scenarios, still focused
 - **Transparent** - Evaluation visible in conversation
 <!-- END MANUAL -->

@@ -2,6 +2,28 @@
 
 All notable changes to the Claude Code Prompt Improver project.
 
+## [0.5.1] - 2026-04-01
+
+### Changed
+- **Trigger mechanism**: Changed from "default evaluation + `*` bypass" to "default pass-through + `?` trigger"
+  - Previous: All prompts evaluated unless prefixed with `*`
+  - New: No evaluation by default, use `?` prefix to trigger evaluation
+  - `*` prefix support removed (replaced by default pass-through)
+- **User control**: Evaluation now opt-in rather than opt-out
+- **Zero overhead by default**: Prompts without `?` pass through unchanged (no token cost)
+- **Triggered evaluation**: Only `?` prefixed prompts get evaluation wrapper (~189 tokens)
+
+### Removed
+- Asterisk (`*`) bypass prefix - replaced by default pass-through mode
+
+### Updated
+- README.md: Updated usage examples with `?` trigger syntax
+- CLAUDE.md: Updated bypass prefixes section and evaluation flow
+- SKILL.md: Updated trigger description to reflect opt-in model
+- tests/test_hook.py: Updated to test `?` trigger and default pass-through
+- tests/test_integration.py: Updated integration tests for new trigger logic
+- plugin.json: Added `skills` field for proper skill registration
+
 ## [0.5.0] - 2025-12-13
 
 ### Changed

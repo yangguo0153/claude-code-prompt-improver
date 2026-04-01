@@ -57,40 +57,52 @@ def test_plugin_configuration():
 
     print("✓ Plugin configuration is correct")
 
-def test_end_to_end_flow():
-    """Test complete flow from prompt to evaluation"""
-    # Test normal prompt
-    output = run_hook("add authentication")
+def test_trigger_evaluation_flow():
+    """Test complete flow when ? prefix triggers evaluation"""
+    # Test ? prefix triggers evaluation
+    output = run_hook("? add authentication")
 
     # Should get evaluation wrapper
     context = output["hookSpecificOutput"]["additionalContext"]
     assert "PROMPT EVALUATION" in context or "EVALUATE" in context
-    assert "add authentication" in context
+    assert "add authentication" in context  # Original prompt content (without prefix)
+    assert not context.startswith("?")  # Context should not start with the trigger prefix
 
     # Should mention skill for vague cases
     assert "skill" in context.lower()
 
-    print("✓ End-to-end flow works (normal prompt → evaluation wrapper)")
+    print("✓ Trigger evaluation flow works (? prefix → evaluation wrapper)")
 
-def test_bypass_flow():
-    """Test that bypass mechanism works end-to-end"""
-    # Test asterisk bypass
-    output = run_hook("* just do it")
+def test_default_pass_through_flow():
+    """Test that default mode passes through unchanged"""
+    # Test normal prompt (no prefix) - should pass through
+    output = run_hook("add authentication")
+
     context = output["hookSpecificOutput"]["additionalContext"]
-    assert context == "just do it"
-    assert "skill" not in context.lower()
+    assert context == "add authentication"  # unchanged
+    assert "PROMPT EVALUATION" not in context
 
+    print("✓ Default pass-through flow works (no prefix → unchanged)")
+
+def test_special_prefix_flow():
+    """Test that / and # prefixes pass through unchanged"""
     # Test slash command
     output = run_hook("/commit")
     context = output["hookSpecificOutput"]["additionalContext"]
     assert context == "/commit"
 
-    # Test hash prefix
+    # Test hash prefix (memorize)
     output = run_hook("# note for later")
     context = output["hookSpecificOutput"]["additionalContext"]
     assert context == "# note for later"
 
-    print("✓ Bypass mechanisms work end-to-end")
+    # Test normal prompt passes through
+    output = run_hook("just do it")
+    context = output["hookSpecificOutput"]["additionalContext"]
+    assert context == "just do it"
+    assert "skill" not in context.lower()
+
+    print("✓ Special prefix flow works (/ and # preserved, default pass-through)")
 
 def test_skill_file_integrity():
     """Test that all skill files are present and valid"""
@@ -120,34 +132,33 @@ def test_skill_file_integrity():
 
 def test_token_overhead():
     """Test that hook overhead is reasonable"""
+    # Test default pass-through (should be zero overhead)
     output = run_hook("test")
 
+    context = output["hookSpecificOutput"]["additionalContext"]
+    assert context == "test"  # No wrapper, direct pass-through
+
+    # Test triggered evaluation overhead
+    output = run_hook("? test")
     context = output["hookSpecificOutput"]["additionalContext"]
 
     # Rough character count (tokens ≈ chars/4 for English)
     char_count = len(context)
     estimated_tokens = char_count // 4
 
-    # New version should be ~200-220 tokens (evaluation prompt with preface instruction)
-    # Old v0.3.2 was ~275 tokens (embedded evaluation logic)
+    # Triggered evaluation should be ~189-200 tokens
     assert estimated_tokens < 250, \
-        f"Hook overhead too high: ~{estimated_tokens} tokens (expected <250)"
+        f"Evaluation overhead too high: ~{estimated_tokens} tokens (expected <250)"
 
-    # Should be less than old version
-    old_estimated_tokens = 275
-    if estimated_tokens < old_estimated_tokens:
-        reduction_percent = ((old_estimated_tokens - estimated_tokens) / old_estimated_tokens) * 100
-        print(f"✓ Token overhead acceptable: ~{estimated_tokens} tokens (<250), ~{reduction_percent:.0f}% reduction from v0.3.2")
-    else:
-        print(f"✓ Token overhead acceptable: ~{estimated_tokens} tokens (<250)")
+    print(f"✓ Token overhead: 0 for pass-through, ~{estimated_tokens} for triggered evaluation")
 
 def test_hook_output_consistency():
-    """Test that hook output is consistent across different prompts"""
+    """Test that hook output is consistent across different triggered prompts"""
     prompts = [
-        "fix the bug",
-        "add tests",
-        "refactor code",
-        "implement feature X",
+        "? fix the bug",
+        "? add tests",
+        "? refactor code",
+        "? implement feature X",
     ]
 
     for prompt in prompts:
@@ -161,9 +172,11 @@ def test_hook_output_consistency():
         # All should have evaluation wrapper
         context = output["hookSpecificOutput"]["additionalContext"]
         assert "EVALUATE" in context or "evaluate" in context.lower()
-        assert prompt in context
+        # Check original prompt content (without ? prefix)
+        original_prompt = prompt[2:]  # strip "? "
+        assert original_prompt in context
 
-    print(f"✓ Hook output consistent across {len(prompts)} different prompts")
+    print(f"✓ Hook output consistent across {len(prompts)} triggered prompts")
 
 def test_architecture_separation():
     """Test that architecture properly separates concerns"""
@@ -190,8 +203,9 @@ def run_all_tests():
     """Run all integration tests"""
     tests = [
         test_plugin_configuration,
-        test_end_to_end_flow,
-        test_bypass_flow,
+        test_trigger_evaluation_flow,
+        test_default_pass_through_flow,
+        test_special_prefix_flow,
         test_skill_file_integrity,
         test_token_overhead,
         test_hook_output_consistency,

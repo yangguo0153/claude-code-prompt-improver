@@ -2,9 +2,14 @@
 """
 Claude Code Prompt Improver Hook
 Evaluates prompts for clarity and invokes the prompt-improver skill for vague cases.
+
+Architecture: Default pass-through, use '?' prefix to trigger evaluation.
 """
 import json
 import sys
+
+# Configuration
+TRIGGER_PREFIX = '?'  # Prefix to trigger evaluation
 
 # Load input from stdin
 try:
@@ -14,9 +19,6 @@ except json.JSONDecodeError as e:
     sys.exit(1)
 
 prompt = input_data.get("prompt", "")
-
-# Escape quotes in prompt for safe embedding
-escaped_prompt = prompt.replace("\\", "\\\\").replace('"', '\\"')
 
 def output_json(text):
     """Output text in UserPromptSubmit JSON format"""
@@ -28,28 +30,17 @@ def output_json(text):
     }
     print(json.dumps(output))
 
-# Check for bypass conditions
-# 1. Explicit bypass with * prefix
+# Check for trigger conditions
+# 1. Trigger evaluation with ? prefix
 # 2. Slash commands (built-in or custom)
 # 3. Memorize feature (# prefix)
-if prompt.startswith("*"):
-    # User explicitly bypassed improvement - remove * prefix
-    clean_prompt = prompt[1:].strip()
-    output_json(clean_prompt)
-    sys.exit(0)
 
-if prompt.startswith("/"):
-    # Slash command - pass through unchanged
-    output_json(prompt)
-    sys.exit(0)
+if prompt.startswith(TRIGGER_PREFIX):
+    # User requested evaluation - remove trigger prefix and add wrapper
+    clean_prompt = prompt[len(TRIGGER_PREFIX):].strip()
+    escaped_prompt = clean_prompt.replace("\\", "\\\\").replace('"', '\\"')
 
-if prompt.startswith("#"):
-    # Memorize feature - pass through unchanged
-    output_json(prompt)
-    sys.exit(0)
-
-# Build the evaluation wrapper
-wrapped_prompt = f"""PROMPT EVALUATION
+    wrapped_prompt = f"""PROMPT EVALUATION
 
 Original user request: "{escaped_prompt}"
 
@@ -67,5 +58,19 @@ ONLY USE SKILL if genuinely vague (e.g., "fix the bug" with no context):
 
 If clear, proceed with the original request. If vague, invoke the skill."""
 
-output_json(wrapped_prompt)
+    output_json(wrapped_prompt)
+    sys.exit(0)
+
+if prompt.startswith("/"):
+    # Slash command - pass through unchanged
+    output_json(prompt)
+    sys.exit(0)
+
+if prompt.startswith("#"):
+    # Memorize feature - pass through unchanged
+    output_json(prompt)
+    sys.exit(0)
+
+# Default: pass through unchanged (no evaluation)
+output_json(prompt)
 sys.exit(0)
